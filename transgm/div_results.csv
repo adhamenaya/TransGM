@@ -1,0 +1,12 @@
+feature,p_value,observed_divergence
+business,0.005,0.4504
+eatery,0.0,0.4933
+education,0.0,0.4556
+leisure,0.0,0.5026
+financial,0.0,0.4817
+historical,0.002,0.4662
+industrial,0.0,0.4998
+medical,0.001,0.4773
+religious,0.01,0.4556
+shopping,0.007,0.4532
+transport,0.003,0.4698
