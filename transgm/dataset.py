@@ -3,12 +3,11 @@ import pandas as pd
 import math
 import os
 from sklearn.preprocessing import MinMaxScaler
-from sklearn.metrics import mean_squared_error, r2_score
 import ast
 import json
+import utils
 
 scaler = MinMaxScaler()
-
 
 class DataSet:
     def __init__(self, city, size=(8,8)):
@@ -29,6 +28,7 @@ class DataSet:
 
         self.categories = sorted(list(self.categories))
 
+        #TODO: calculate it ------>
         # Load divergence configurations
         df_divs = pd.read_csv('div_results.csv')
         self.divs = []
@@ -41,15 +41,6 @@ class DataSet:
                 self.divs_name.append(category)
 
         self.divs = np.array(self.divs)
-
-    # Utility functions
-    def log(self, x):
-        return np.log(x)
-        return np.log(1 + np.exp(x))  # Avoids log(0) issues
-
-    def exp(self, x):
-        return np.log(np.abs(np.exp(x) - 1))
-
 
     # Matrix creation functions
     def create_trip_matrix(self, dataset):
@@ -128,7 +119,7 @@ class DataSet:
 
         return matrix
 
-    def get_city_data(self, city_name, od, poi, size, scaler, sample_ratio=1.0, random_seed=None):
+    def get_city_data(self, city_name, sample_ratio=1.0, random_seed=None):
         """Get and process city data with optional sampling"""
         dataset = pd.read_csv(f'input/od/{city_name}_od_grid.csv')
         print(f"Original dataset shape: {dataset.shape}")
@@ -186,6 +177,6 @@ class DataSet:
         X1 = scaled_matrix.reshape(X1.shape)
         X2 = scaler.fit_transform(X2) + 1e-6
         X0 = scaler.fit_transform(X0) + 1e-6
-        y = scaler.fit_transform(self.log(y + 1e-6)) + 1e-6
+        y = scaler.fit_transform(utils.log(y + 1e-6)) + 1e-6
 
         return X0, X1, X2, y

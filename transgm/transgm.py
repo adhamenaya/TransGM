@@ -22,21 +22,13 @@ from sklearn.preprocessing import MinMaxScaler
 import math
 scaler = MinMaxScaler()
 from sklearn.metrics import mean_squared_error, r2_score
-import ast  # safely evaluates string tuples like "(4, 5)" to actual tuples
-import json
-# Transim modules
-from poidata import POIData
-from oddata import ODData
-from models.divergence import Div
-from sklearn.model_selection import KFold, GridSearchCV
+
+from sklearn.model_selection import KFold
 from scipy.optimize import minimize
 import pandas as pd
 from collections import defaultdict
-import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.lines import Line2D
 import uuid
-import base64
 from dataset import DataSet
 from adaptfunc import AdaptFunc
 
@@ -176,7 +168,7 @@ class TransGM(BaseEstimator, TransformerMixin):
 
         print(f"Baseline model {source_city} - Run# {run_id}\n")
         # Get data
-        kfX, kfy = self.src_dataset_obj.get_city_data(source_city, od, poi, self.src_dataset_obj.size, scaler, sample_ratio=model_sample, random_seed=42)
+        kfX, kfy = self.src_dataset_obj.get_city_data(source_city)
 
         # For storing results
         cv_results = defaultdict(list)
@@ -376,7 +368,7 @@ class TransGM(BaseEstimator, TransformerMixin):
         print("\nTraining final model on entire dataset...")
         params_log = {}
 
-        X_all, y_all = self.src_dataset_obj.get_city_data(source_city, od, poi, self.src_dataset_obj.size, scaler)
+        X_all, y_all = self.src_dataset_obj.get_city_data(source_city)
         combined_all = X_all.copy()
         combined_all['trips'] = y_all
 
@@ -494,7 +486,7 @@ class TransGM(BaseEstimator, TransformerMixin):
         # Now test the final model on the entire dataset with best parameters
         print("\nTesting final model on another city dataset...")
         self.tgt_dataset_obj = DataSet(target_city)
-        X_all, y_all = self.tgt_dataset_obj.get_city_data(target_city, od, poi, self.tgt_dataset_obj.size, scaler, sample_ratio=model_sample)
+        X_all, y_all = self.tgt_dataset_obj.get_city_data(target_city)
         combined_all = X_all.copy()
         combined_all['trips'] = y_all
         combined_all = pd.DataFrame(combined_all)
@@ -600,7 +592,7 @@ class TransGM(BaseEstimator, TransformerMixin):
         print("\nTesting final model on another city dataset...")
 
         # Target city data / transfer learning
-        X_all, y_all = self.tgt_dataset_obj.get_city_data(target_city, od, poi, self.tgt_dataset_obj.size, scaler, sample_ratio=model_sample)
+        X_all, y_all = self.tgt_dataset_obj.get_city_data(target_city)
         combined_all = X_all.copy()
         combined_all['trips'] = y_all
         combined_all = pd.DataFrame(combined_all)
