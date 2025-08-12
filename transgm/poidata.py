@@ -1,20 +1,11 @@
-import sys
-
 import numpy as np
 import pandas as pd
-
-from TranSim.data.spatialgrid import SpatialGrid
-from models import utils
-
-sys.path.append('./models')
+from spatialgrid import SpatialGrid
 
 
 class POIData:
     """
     A class for handling Origin-Destination (OD) datasets, including loading, preprocessing, and validation.
-
-    Attributes:
-      - data: Pandas DataFrame containing OD flow data.
     """
 
     def __init__(self, spacing_km=1, file_path=None, shp_path=None):

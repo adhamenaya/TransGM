@@ -71,7 +71,8 @@ class TransGM(BaseEstimator, TransformerMixin):
 
         self.source = None
         self.target = None
-        self.divs = []
+        self.divs = {}
+        self.datasets = {}
 
     # Define gradients for optimization
     def gradient(self, params, data, lambda_=0.1):
@@ -159,16 +160,31 @@ class TransGM(BaseEstimator, TransformerMixin):
 
         return pred_error
 
+    def load_data(self, dataset):
+        """Load dataset for a specific city."""
+        if dataset is None:
+            raise ValueError("Dataset cannot be None")
+        if not dataset.city:
+            raise ValueError("City name cannot be empty")
+
+        # Initialize datasets dict if it doesn't exist
+        if not hasattr(self, 'datasets'):
+            self.datasets = {}
+
+        self.datasets[dataset.city] = dataset
+        print(f"Loaded dataset for {dataset.city}")
+
     def fit(self, source_city, serial=0, model_sample=1.0):
-        self.src_dataset_obj = DataSet(source_city)
+        self.src_dataset_obj = self.datasets[source_city]
         self.source = source_city
+
         uuid_val = uuid.uuid4().hex[:8]
         params_log = {}
         run_id = f"{serial}_{uuid_val}"
 
         print(f"Baseline model {source_city} - Run# {run_id}\n")
         # Get data
-        kfX, kfy = self.src_dataset_obj.get_city_data(source_city)
+        kfX, kfy = self.src_dataset_obj.od_data()
 
         # For storing results
         cv_results = defaultdict(list)
@@ -368,7 +384,7 @@ class TransGM(BaseEstimator, TransformerMixin):
         print("\nTraining final model on entire dataset...")
         params_log = {}
 
-        X_all, y_all = self.src_dataset_obj.get_city_data(source_city)
+        X_all, y_all = self.src_dataset_obj.od_data()
         combined_all = X_all.copy()
         combined_all['trips'] = y_all
 
@@ -479,14 +495,16 @@ class TransGM(BaseEstimator, TransformerMixin):
 
     def transfer(self, target_city, serial=0, model_sample=1.0):
         self.target = target_city
+        self.tgt_dataset_obj = self.datasets[target_city]
+
         uuid_val = uuid.uuid4().hex[:8]
         run_id = f"{serial}_{uuid_val}"
         print(f"Naive transfer model {target_city} - Run# {run_id}\n")
 
         # Now test the final model on the entire dataset with best parameters
         print("\nTesting final model on another city dataset...")
-        self.tgt_dataset_obj = DataSet(target_city)
-        X_all, y_all = self.tgt_dataset_obj.get_city_data(target_city)
+
+        X_all, y_all = self.tgt_dataset_obj.od_data()
         combined_all = X_all.copy()
         combined_all['trips'] = y_all
         combined_all = pd.DataFrame(combined_all)
@@ -579,9 +597,9 @@ class TransGM(BaseEstimator, TransformerMixin):
         self.trans_model_results = updated_results
         return self
 
-    def adapt(self, target_city, adapt_func='log', serial=0, model_sample=0.5):
-        self.traget = target_city
-        self.tgt_dataset_obj = DataSet(target_city)
+    def adapt(self, target_city, adapt_func='log_penalty', serial=0, model_sample=0.5):
+        self.target = target_city
+        self.tgt_dataset_obj = self.datasets[target_city]
 
         uuid_val = uuid.uuid4().hex[:8]
         params_log = {}
@@ -592,7 +610,7 @@ class TransGM(BaseEstimator, TransformerMixin):
         print("\nTesting final model on another city dataset...")
 
         # Target city data / transfer learning
-        X_all, y_all = self.tgt_dataset_obj.get_city_data(target_city)
+        X_all, y_all = self.tgt_dataset_obj.od_data()
         combined_all = X_all.copy()
         combined_all['trips'] = y_all
         combined_all = pd.DataFrame(combined_all)
@@ -638,11 +656,10 @@ class TransGM(BaseEstimator, TransformerMixin):
             })
 
             # Calculate regularization terms with feature-specific penalties
-            if self.divs is None or not self.divs.any():
+            if self.get_divs() is None or not self.get_divs():
                 raise ValueError("You must provide feature divergence first")
-                return
 
-            A_penalty_factors = AdaptFunc.get(adapt_func)(self.divs, k=k)
+            A_penalty_factors = getattr(AdaptFunc, adapt_func)(self.get_divs(), k=k)
             # print(f"Penalty factors: {A_penalty_factors}")
             # L2 regularization on parameter differences from source model
             A_reg = np.sum(A_penalty_factors * np.abs(A - A_opt) ** 2)
@@ -706,7 +723,7 @@ class TransGM(BaseEstimator, TransformerMixin):
                             trans_loss,
                             trans_init_params,
                             args=(X1_tgt_train, X2_tgt_train, X0_tgt_train, y_tgt_train,
-                                  self.divs, k, self.src_model_results.optimal_A, self.src_model_results.optimal_b, self.src_model_results.optimal_d, self.src_model_results.optimal_e, lambda_reg),
+                                  self.get_divs(), k, self.src_model_results.optimal_A, self.src_model_results.optimal_b, self.src_model_results.optimal_d, self.src_model_results.optimal_e, lambda_reg),
                             bounds=bounds,
                             method='L-BFGS-B',
                             options={'maxiter': 200, 'ftol': 1e-8, 'gtol': 1e-8}
@@ -758,7 +775,7 @@ class TransGM(BaseEstimator, TransformerMixin):
         final_result = minimize(
             trans_loss,
             trans_init_params,
-            args=(X1_tgt, X2_tgt, X0_tgt, y_tgt, self.divs, best_k, self.src_model_results.optimal_A, self.src_model_results.optimal_b, self.src_model_results.optimal_d, self.src_model_results.optimal_e, best_lambda),
+            args=(X1_tgt, X2_tgt, X0_tgt, y_tgt, self.get_divs(), best_k, self.src_model_results.optimal_A, self.src_model_results.optimal_b, self.src_model_results.optimal_d, self.src_model_results.optimal_e, best_lambda),
             bounds=bounds,
             method='L-BFGS-B',
             options={'maxiter': 300, 'ftol': 1e-8, 'gtol': 1e-8}
@@ -834,9 +851,12 @@ class TransGM(BaseEstimator, TransformerMixin):
         )
         return self
 
-    def set_divs(self, divs):
+    def with_divs(self, divs):
         self.divs = divs
         return self
+
+    def get_divs(self):
+        return np.array(list(map(float, self.divs.values())))
 
     def results(self, model):
         if model == 'base':
