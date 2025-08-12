@@ -1,53 +1,20 @@
-# -----------------------------------------------------------------------------
-# Author: Adham Enaya
-# PhD Supervisors: Prof. Chen Zhong and Prof. Micheal Batty
-# Affiliation: Centre for Advanced Spatial Analysis, UCL
-# Project Title: TransGM: Transferable Gravity Models for Adaptive Urban Policy
-# Funding: European Research Council (ERC) under the EU Horizon 2020 program (No. 949670)
-# Date: 2025-08-10
-# -----------------------------------------------------------------------------
-from collections import defaultdict
-
 from sklearn.base import BaseEstimator, TransformerMixin
-import models.utils
-import models.spatial
-import numpy as np
-import pandas as pd
 import utils
-import time
 import copy
-
-from data import od, poi
-from sklearn.preprocessing import MinMaxScaler
-import math
-scaler = MinMaxScaler()
 from sklearn.metrics import mean_squared_error, r2_score
-
 from sklearn.model_selection import KFold
 from scipy.optimize import minimize
 import pandas as pd
 from collections import defaultdict
 import numpy as np
 import uuid
-from dataset import DataSet
 from adaptfunc import AdaptFunc
+
 
 class TransGM(BaseEstimator, TransformerMixin):
     """
     A machine learning model for flow prediction based on Gravity Model.
-
-    y represents the origin-destination (OD) matrix,
-    X consists of:
-      - Origin features vector
-      - Destination features matrix
-      - Distance matrix
-
-    Model parameters (gravity model):
-      - beta: Distance decay parameter
-      - gamma: Origin attractiveness parameter
-      - alpha: Destination attractiveness parameter
     """
-
     def __init__(self, beta=1.0, gamma=1.0, alpha=1.0, decay_func='exp'):
         """Initialize the model with gravity model parameters."""
         self.beta = beta

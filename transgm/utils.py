@@ -45,11 +45,6 @@ def convert_to_serializable(obj):
 def save_params_log(params_log, serial, folder="model_results"):
     """
     Save logged parameters to a JSON file in the given folder.
-
-    Args:
-        params_log (dict): Dictionary containing logged parameters.
-        serial (str): Unique identifier for the log file.
-        folder (str, optional): Directory where the file will be saved.
     """
     # Ensure directory exists
     os.makedirs(folder, exist_ok=True)

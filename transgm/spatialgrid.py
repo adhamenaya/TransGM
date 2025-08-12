@@ -2,7 +2,6 @@ import geopandas as gpd
 import numpy as np
 from KDEpy import FFTKDE
 from KDEpy.bw_selection import silvermans_rule
-from scipy.interpolate import RegularGridInterpolator
 from shapely import Point, Polygon
 
 
@@ -209,27 +208,6 @@ class SpatialGrid:
         self.centers = np.array(ctrs)  # Store centers
         return len(lon_grid) - 1, len(lat_grid) - 1, grid, norm_grid, ctrs, ctr_wts
 
-    def get_window(self, grid_values, i, j, window_size=3):
-        """
-        (i, j) are x,y/ col,row indices. j starts from the bottom (j=0 is the last row).
-        Extract a 3x3 window (or smaller if near edges) around position (i, j).
-        """
-        rows, cols = grid_values.shape
-
-        # Adjust row index 'j' to be 0-based from the top
-        row_index_top_origin = j
-
-        # Compute window boundaries for rows (top-origin indexing)
-        row_start = max(row_index_top_origin - 1, 0)
-        row_end = min(row_index_top_origin + 1, rows - 1)
-
-        # Compute window boundaries for columns
-        col_start = max(i - 1, 0)
-        col_end = min(i + 1, cols - 1)
-
-        # Extract neighborhood
-        neighborhood = grid_values[row_start:row_end + 1, col_start:col_end + 1]
-        return neighborhood
 
     def get_window(self, grid_values, i, j, window_size=3):
         rows, cols = grid_values.shape
@@ -251,3 +229,17 @@ class SpatialGrid:
         neighborhood = grid_values[row_start:row_end + 1, col_start:col_end + 1]
         return neighborhood
 
+    def get_weight(self, window, window_size=3):
+        weights = np.ones_like(window, dtype=float)
+        center_row = window.shape[0] // 2
+        center_col = window.shape[1] // 2
+        if weights.shape[0] > 0 and weights.shape[1] > 0:
+            weights[center_row, center_col] = 0  # Exclude center for rook/queen contiguity
+            if weights.sum() > 0:
+                weights /= weights.sum()  # Normalize to sum to 1
+        return weights
+
+    def get_window_padded(self, grid_values, i, j, window_size=3):
+        half_w = window_size // 2
+        padded = np.pad(grid_values, half_w, mode='constant', constant_values=0)
+        return padded[i:i + window_size, j:j + window_size]
