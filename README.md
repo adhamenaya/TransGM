@@ -18,10 +18,7 @@ We first measure the differences in **Point-of-Interest (POI)** and land-use dis
 2. **Local Spatial Divergence**  
    - For each grid cell, we form a **patch** containing the cell and its neighbours.  
    - Patches are converted into histograms over POI types, with bin widths optimised via **leave-one-cell-out cross-validation**.  
-   - The **Jensen–Shannon Divergence (JSD)** is computed between corresponding patches in the two cities:  
-     \[
-     \mathrm{JSD}(P_i \parallel Q_i) = \frac{1}{2} KL(P_i \parallel M_i) + \frac{1}{2} KL(Q_i \parallel M_i)
-     \]
+   - The **Jensen–Shannon Divergence (JSD)** is computed between corresponding patches in the two cities.
    - We average these local divergences to form the **overall divergence score** for each POI type.
 
 ---
@@ -29,9 +26,7 @@ We first measure the differences in **Point-of-Interest (POI)** and land-use dis
 ### **2. Source Model Training**
 We extend the **gravity model** to incorporate POI-based attractiveness:
 
-\[
-T_{ij} = O_i^\alpha \cdot \left( \sum_{k=1}^n \lambda_k \cdot \mathrm{POI}_{j,k} \right) \cdot d_{ij}^{-\beta}
-\]
+<img alt="Gravity Model" src="res/fig1.png" width="800"/>
 
 - \(O_i\) – trip potential from origin cell `i`  
 - \(\lambda_k\) – attraction weight for POI type `k`  
@@ -45,15 +40,9 @@ T_{ij} = O_i^\alpha \cdot \left( \sum_{k=1}^n \lambda_k \cdot \mathrm{POI}_{j,k}
 ---
 
 ### **3. Adaptive Transfer to Target City**
-We initialise the target city model using parameters from the source city, then **adapt** them using a small amount of target data.
+We initialise the target city model using parameters from the source city, then **adapt** them using a small amount of target data:
 
-The transfer objective:
-
-\[
-L_{\mathrm{transfer}} =
-\underbrace{\mathrm{MSE}(y_t, X_t \lambda_t)}_{\text{Prediction Loss}} +
-\underbrace{K \cdot f_{\mathrm{DA}}(\delta(\mathrm{POI})) \cdot \lVert \lambda_t - \lambda_s \rVert^2}_{\text{Domain Adaptation Penalty}}
-\]
+<img alt="Adaptive Transfer" src="res/fig2.png" width="800"/>
 
 - **Prediction Loss**: Ensures fit to target city observations.  
 - **Domain Adaptation Penalty**: Restricts changes to \(\lambda\) based on POI divergence:
@@ -62,7 +51,7 @@ L_{\mathrm{transfer}} =
 
 ---
 
-## Workflow in Code
+## Workflow
 
 ### **1. Data Preparation**
 ```python
@@ -114,17 +103,3 @@ model.load_divs(results).adapt('coventry')
 
 ## License
 
-MIT License – see `LICENSE` for details.
-
-```
-
----
-
-This keeps your README in **GitHub-friendly format** but now fully incorporates your methodology’s key concepts:  
-- **Spatial grid normalisation**  
-- **Local patch-based divergence with JSD**  
-- **Gravity model with ridge regression**  
-- **Adaptive divergence-aware transfer**  
-
-If you want, I can also **add a figure diagramming the three-step TransGM process** so the README is visually aligned with the paper. That would make it much easier for readers to understand at a glance.
-```
