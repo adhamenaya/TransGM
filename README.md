@@ -2,8 +2,7 @@
 
 This repository implements **TransGM**, a three-step framework for transferring spatial interaction models between cities by quantifying **land-use feature divergence** and applying **adaptive regularisation**.
 
----
-Author:Adham Enaya  
+Author: Adham Enaya  
 PhD Project, UCL CASA
 Supervisors: Prof. Chen Zhong, Prof. Micheal Batty  
 Funding: ERC Horizon 2020 (Grant No. 949670)  
