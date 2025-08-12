@@ -486,9 +486,9 @@ class TransGM(BaseEstimator, TransformerMixin):
             cv_best_params=best_params,
             cv_best_score=best_score,
             pred_trips=pred_trips,
-            dist_matrix = X2,
-            dest_result = [y_dest, pred_dest],
-            orig_result = [y_orig, pred_orig]
+            dist_matrix=X2,
+            dest_result=[y_dest, pred_dest],
+            orig_result=[y_orig, pred_orig]
         )
 
         return self # self at this point represent the trained model
@@ -551,7 +551,6 @@ class TransGM(BaseEstimator, TransformerMixin):
         y_dest = np.sum(y, axis=0).reshape(int(np.sqrt(y.shape[0])), int(np.sqrt(y.shape[0])))
         y_dest = y_dest / np.sum(y_dest)
         in_r2 = r2_score(y_dest.flatten(), pred_dest.flatten())
-
 
         mae = np.sum(np.abs(pred_dest - y_dest)) / self.tgt_dataset_obj.size[0]
         mse = np.sum((pred_dest - y_dest) ** 2) / self.tgt_dataset_obj.size[0]
@@ -634,7 +633,7 @@ class TransGM(BaseEstimator, TransformerMixin):
             params_log[run_id] = []
 
         # Define transfer learning loss function with regularization
-        def trans_loss(params, X1, X2, X0, y_trans, divs, k, A_opt, b_opt, d_opt, e_opt, lambda_reg=0.1):
+        def trans_loss(params, X1, X2, X0, y_trans, k, A_opt, b_opt, d_opt, e_opt, lambda_reg=0.1):
             d, b, *A_vals = params[:-1]
             e = params[-1]
             A = np.array(A_vals)
@@ -656,10 +655,11 @@ class TransGM(BaseEstimator, TransformerMixin):
             })
 
             # Calculate regularization terms with feature-specific penalties
-            if self.get_divs() is None or not self.get_divs():
+            divs = self.get_divs()
+            if divs is None or len(divs) == 0:
                 raise ValueError("You must provide feature divergence first")
 
-            A_penalty_factors = getattr(AdaptFunc, adapt_func)(self.get_divs(), k=k)
+            A_penalty_factors = getattr(AdaptFunc, adapt_func)(divs, k=k)
             # print(f"Penalty factors: {A_penalty_factors}")
             # L2 regularization on parameter differences from source model
             A_reg = np.sum(A_penalty_factors * np.abs(A - A_opt) ** 2)
@@ -667,7 +667,6 @@ class TransGM(BaseEstimator, TransformerMixin):
             b_reg = lambda_reg * np.abs(b - b_opt) ** 2
             d_reg = lambda_reg * np.abs(d - d_opt) ** 2
             e_reg = lambda_reg * np.abs(e - e_opt) ** 2
-
 
             # Total loss with regularization
             return (prediction_error
@@ -685,9 +684,7 @@ class TransGM(BaseEstimator, TransformerMixin):
 
         # Define parameter grid for cross-validation
         k_values = [0.01, 0.1, 1.0, 10.0, 100.0, 1000.0]
-        # k_values = [15, 20, 25, 30, 35, 40]
         lambda_values = [0.001, 0.01, 0.1, 1.0, 10.0]
-        # lambda_values = [1000, 1500, 2000, 2500, 3000]
 
         # Setup cross-validation
         kf = KFold(n_splits=5, shuffle=True, random_state=42)
@@ -722,8 +719,11 @@ class TransGM(BaseEstimator, TransformerMixin):
                         transfer_result = minimize(
                             trans_loss,
                             trans_init_params,
-                            args=(X1_tgt_train, X2_tgt_train, X0_tgt_train, y_tgt_train,
-                                  self.get_divs(), k, self.src_model_results.optimal_A, self.src_model_results.optimal_b, self.src_model_results.optimal_d, self.src_model_results.optimal_e, lambda_reg),
+                            args=(X1_tgt_train, X2_tgt_train, X0_tgt_train, y_tgt_train, k,
+                                  self.src_model_results.optimal_A,
+                                  self.src_model_results.optimal_b,
+                                  self.src_model_results.optimal_d,
+                                  self.src_model_results.optimal_e, lambda_reg),
                             bounds=bounds,
                             method='L-BFGS-B',
                             options={'maxiter': 200, 'ftol': 1e-8, 'gtol': 1e-8}
@@ -742,7 +742,6 @@ class TransGM(BaseEstimator, TransformerMixin):
                     # Evaluate on validation set
                     val_pred = self.pred(A_val, X1_tgt_val, X2_tgt_val, b_val, d_val, X0_tgt_val, e_val)
                     val_r2 = r2_score(y_tgt_val.flatten(), val_pred.flatten())
-                    # print(f"Fold R2: {val_r2:.4f}, Predictions Mean: {val_pred.mean()}, Std: {val_pred.std()}")
 
                     fold_scores.append(val_r2)
 
@@ -851,7 +850,8 @@ class TransGM(BaseEstimator, TransformerMixin):
         )
         return self
 
-    def with_divs(self, divs):
+    def load_divs(self, divs):
+        """ Load divergence """
         self.divs = divs
         return self
 

@@ -1,3 +1,4 @@
+# from spatialgrid import SpatialGrid as sp
 import spatial as sp
 import numpy as np
 from scipy.stats import gaussian_kde

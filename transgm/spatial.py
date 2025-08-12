@@ -42,29 +42,6 @@ def get_window(grid_values, i, j, window_size=3):
     # Extract neighborhood
     neighborhood = grid_values[row_start:row_end + 1, col_start:col_end + 1]
     return neighborhood
-# =======
-#
-#             # lm += (z[m] * z[k]) / distance #emphasize the deviation from the global mean
-#             # Inverse absolute difference similarity
-#             similarity = (1.0 / (1.0 + abs(x[m] - x[k]))) / distance
-#             lm += similarity
-#
-#     return lm / n  # Normalize by number of cells
-# def get_window(grid_values, i, j, window_size=3):
-#     rows, cols = grid_values.shape
-#
-#     window_radius = window_size // 2
-#
-#     # Compute window boundaries (i: row, j: col)
-#     row_start = max(0, i - window_radius)
-#     row_end = min(rows, i + window_radius + 1)
-#
-#     col_start = max(0, j - window_radius)
-#     col_end = min(cols, j + window_radius + 1)
-#
-#     # Extract neighborhood
-#     neighborhood = grid_values[row_start:row_end, col_start:col_end]
-#     return neighborhood
 
 def get_weight(window, window_size=3):
     weights = np.ones_like(window, dtype=float)
