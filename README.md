@@ -5,8 +5,8 @@ This repository implements **TransGM**, a three-step framework for transferring 
 ---
 Author:Adham Enaya  
 PhD Project, UCL CASA
-Supervisors:** Prof. Chen Zhong, Prof. Micheal Batty  
-Funding:** ERC Horizon 2020 (Grant No. 949670)  
+Supervisors: Prof. Chen Zhong, Prof. Micheal Batty  
+Funding: ERC Horizon 2020 (Grant No. 949670)  
 ---
 ## Methodology
 
