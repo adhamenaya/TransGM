@@ -46,7 +46,7 @@ We initialise the target city model using parameters from the source city, then 
 <img alt="Adaptive Transfer" src="https://raw.githubusercontent.com/adhamenaya/TransGM/refs/heads/master/transgm/res/fig2.png" width="800"/>
 
 - **Prediction Loss**: Ensures fit to target city observations.  
-- **Domain Adaptation Penalty**: Restricts changes to \(\lambda\) based on POI divergence:
+- **Domain Adaptation Penalty**: Restricts changes to `gamma` based on POI divergence:
   - If features are similar (low divergence), changes are penalised more heavily.
   - If features are dissimilar (high divergence), adaptation is allowed more freedom.
 
