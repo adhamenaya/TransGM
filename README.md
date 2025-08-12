@@ -28,10 +28,11 @@ We extend the **gravity model** to incorporate POI-based attractiveness:
 
 <img alt="Gravity Model" src="https://raw.githubusercontent.com/adhamenaya/TransGM/refs/heads/master/transgm/res/fig1.png" width="800"/>
 
-- \(O_i\) – trip potential from origin cell `i`  
-- \(\lambda_k\) – attraction weight for POI type `k`  
-- \(d_{ij}\) – distance between cells `i` and `j`  
-- \(\alpha, \beta\) – trip generation and distance decay parameters
+- `Oi` – trip potential from origin cell `i`
+- `POIjk` – attraction weight for POI type `k` at destination cell `j`
+- `dij` – distance between cells `i` and `j`
+- `alpha, gamma, beta` – trip generation, attraction, and distance decay parameters, respectively
+
 
 **Estimation:**
 - The model is linearised via log-transform and trained using **ridge regression** (L2-regularised) to stabilise coefficients.
