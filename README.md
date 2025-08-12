@@ -26,7 +26,7 @@ We first measure the differences in **Point-of-Interest (POI)** and land-use dis
 ### **2. Source Model Training**
 We extend the **gravity model** to incorporate POI-based attractiveness:
 
-<img alt="Gravity Model" src="/res/fig1.png" width="800"/>
+<img alt="Gravity Model" src="https://raw.githubusercontent.com/adhamenaya/TransGM/refs/heads/master/transgm/res/fig1.png" width="800"/>
 
 - \(O_i\) – trip potential from origin cell `i`  
 - \(\lambda_k\) – attraction weight for POI type `k`  
@@ -42,7 +42,7 @@ We extend the **gravity model** to incorporate POI-based attractiveness:
 ### **3. Adaptive Transfer to Target City**
 We initialise the target city model using parameters from the source city, then **adapt** them using a small amount of target data:
 
-<img alt="Adaptive Transfer" src="/res/fig2.png" width="800"/>
+<img alt="Adaptive Transfer" src="https://raw.githubusercontent.com/adhamenaya/TransGM/refs/heads/master/transgm/res/fig2.png" width="800"/>
 
 - **Prediction Loss**: Ensures fit to target city observations.  
 - **Domain Adaptation Penalty**: Restricts changes to \(\lambda\) based on POI divergence:
