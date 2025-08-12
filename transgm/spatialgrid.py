@@ -14,15 +14,6 @@ class SpatialGrid:
         self.centers = None  # added centers attribute
         self.optimal_bws = optimal_bws  # added optimal bandwidths attribute
 
-    def grid_dims(self):
-        """Calculates grid dimensions based on shapefile bounds and spacing."""
-        gdf = gpd.read_file(self.shp_path).to_crs(epsg=4326)
-        min_x, min_y, max_x, max_y = gdf.total_bounds
-        lat_step = self.spacing_km / 111
-        lon_step = self.spacing_km / (111 * np.cos(np.radians(min_y)))
-        x_dim = int(np.ceil((max_x - min_x) / lon_step))
-        y_dim = int(np.ceil((max_y - min_y) / lat_step))
-        return x_dim, y_dim
 
     def optimal_kde(self, data, new_size=None):
         # Compute bandwidth using Silverman's rule (keeping original code)
@@ -84,97 +75,10 @@ class SpatialGrid:
         # Extract sorted unique x and y values
         return X, Y, z_reshaped, new_size
 
-    def optimal_kde0(self, data, new_size=None):
-        for size in range(3, 200):  # Iterate over possible grid sizes
-            print(f"trying bw {size}")
-            # Compute bandwidth using Silverman's rule (keeping original code)
-            bw1 = silvermans_rule(data[:, [0]])  # Bandwidth for x
-            bw2 = silvermans_rule(data[:, [1]])  # Bandwidth for y
-
-            # Scale data for KDE computation
-            data_scaled = data[:, :2] / np.array([bw1, bw2])
-            wts = data[:, 2]  # Extract weights
-
-            # Fit Kernel Density Estimator using FFT-based KDE
-            kde = FFTKDE(bw=1).fit(data_scaled, weights=wts)
-
-            # Evaluate KDE on a (size x size) grid
-            xy_scl, z_scl = kde.evaluate((size, size))
-
-            # Rescale coordinates back to original space
-            xy = xy_scl * np.array([bw1, bw2])
-            z = z_scl / (bw1 * bw2)  # Adjust for scaling
-
-            # Extract sorted unique x and y values
-            x_vals = np.sort(np.unique(xy[:, 0]))
-            y_vals = np.sort(np.unique(xy[:, 1]))
-
-            # Compute the double integral over the density estimate
-            integral = np.trapz(np.trapz(z.reshape(size, size), x_vals, axis=0), y_vals, axis=0)
-            print(f"integral: {integral}")
-            # Stop if the integral is sufficiently close to 1
-            if np.abs(integral - 1) < 0.01:
-                z_vals = z.reshape(size, size)
-
-                if new_size is not None:  # If a new grid size is provided
-                    print(f"Evaluate new size {new_size}")
-                    xy_scl_new, z_scl_new = kde.evaluate(new_size[0])
-
-                    # Generate new grid coordinates in original scale
-                    xy_new = xy_scl_new * np.array([bw1, bw2])
-
-                    z_new = z_scl_new / (bw1 * bw2)  # Adjust for scaling
-
-                    # Reshape KDE estimates into new grid
-                    z_vals_new = z_new.reshape(new_size[0], new_size[1])
-
-                    return xy_new[:, 0], xy_new[:, 1], z_vals_new, new_size
-                else:
-                    return x_vals, y_vals, z_vals, size
-
-        print("Np optimal KDE found!!!")
-        return
-
     def resample_kde(self, data, target_dims=None, normalize=False):
         """Resamples KDE output to target dimensions."""
         x,y,z, _ = self.optimal_kde(data, new_size=target_dims)
         return x,y,z
-
-    def resample_kde0(self, data, target_dims=None, bws=False):
-        (size1, size2) = target_dims
-        (bw1, bw2) = bws
-
-        # Scale data for KDE computation
-        data_scaled = data[:, :2] / np.array([bw1, bw2])
-        wts = data[:, 2]  # Extract weights
-        kde = FFTKDE(bw=1).fit(data_scaled, weights=wts)
-
-        # Evaluate KDE on a (size x size) grid
-        xy_scl, z_scl = kde.evaluate((size1, size2))
-
-        # Rescale coordinates back to original space
-        xy = xy_scl * np.array([bw1, bw2])
-        z = z_scl / (bw1 * bw2)  # Adjust for scaling
-
-        # Create the meshgrid
-        x_unique = np.unique(xy[:, 1])
-        y_unique = np.unique(xy[:, 0])
-        X, Y = np.meshgrid(x_unique, y_unique)
-
-        # Reshape z to match the grid dimensions
-        z_reshaped = z.reshape(len(y_unique), len(x_unique)).T
-
-        return X, Y, z_reshaped
-
-    def interpolate_kde(self, x_vals, y_vals, z_vals, x_target=10, y_target=12):
-        """Interpolates KDE results to new grid dimensions."""
-        x_new = np.linspace(x_vals.min(), x_vals.max(), x_target)
-        y_new = np.linspace(y_vals.min(), y_vals.max(), y_target)
-        x_grid, y_grid = np.meshgrid(x_new, y_new, indexing="ij")
-        interp_func = RegularGridInterpolator((x_vals, y_vals), z_vals, method='linear')
-        z_new = interp_func(np.array([x_grid.ravel(), y_grid.ravel()]).T).reshape(x_target, y_target)
-        z_new /= np.trapz(np.trapz(z_new, y_new, axis=1), x_new)
-        return x_new, y_new, z_new
 
     def gen_grid(self, city_name, grid_spacing_km=3, center=None, bbox_buffer_km=1, bottom_left_buffer_km=2):
         """
@@ -305,18 +209,6 @@ class SpatialGrid:
         self.centers = np.array(ctrs)  # Store centers
         return len(lon_grid) - 1, len(lat_grid) - 1, grid, norm_grid, ctrs, ctr_wts
 
-    def find_closest_cell(self, x, y):
-        """Find the closest grid cell to the given (x, y) coordinate."""
-        # Compute the Euclidean distance between the point (x, y) and all grid centers
-        distances = np.sqrt((self.centers[:, 0] - x) ** 2 + (self.centers[:, 1] - y) ** 2)
-
-        # Find the index of the minimum distance
-        closest_idx = np.argmin(distances)
-
-        return closest_idx
-
-    import numpy as np
-
     def get_window(self, grid_values, i, j, window_size=3):
         """
         (i, j) are x,y/ col,row indices. j starts from the bottom (j=0 is the last row).
@@ -339,7 +231,6 @@ class SpatialGrid:
         neighborhood = grid_values[row_start:row_end + 1, col_start:col_end + 1]
         return neighborhood
 
-
     def get_window(self, grid_values, i, j, window_size=3):
         rows, cols = grid_values.shape
 
@@ -359,19 +250,4 @@ class SpatialGrid:
         # Extract neighborhood
         neighborhood = grid_values[row_start:row_end + 1, col_start:col_end + 1]
         return neighborhood
-
-    def get_weight(self, window, window_size=3):
-        weights = np.ones_like(window, dtype=float)
-        center_row = window.shape[0] // 2
-        center_col = window.shape[1] // 2
-        if weights.shape[0] > 0 and weights.shape[1] > 0:
-            weights[center_row, center_col] = 0  # Exclude center for rook/queen contiguity
-            if weights.sum() > 0:
-                weights /= weights.sum()  # Normalize to sum to 1
-        return weights
-
-    def get_window_padded(self, grid_values, i, j, window_size=3):
-        half_w = window_size // 2
-        padded = np.pad(grid_values, half_w, mode='constant', constant_values=0)
-        return padded[i:i + window_size, j:j + window_size]
 

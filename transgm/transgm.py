@@ -45,14 +45,14 @@ class TransGM(BaseEstimator, TransformerMixin):
     Model parameters (gravity model):
       - beta: Distance decay parameter
       - gamma: Origin attractiveness parameter
-      - delta: Destination attractiveness parameter
+      - alpha: Destination attractiveness parameter
     """
 
-    def __init__(self, beta=1.0, gamma=1.0, delta=1.0, decay_func='exp'):
+    def __init__(self, beta=1.0, gamma=1.0, alpha=1.0, decay_func='exp'):
         """Initialize the model with gravity model parameters."""
         self.beta = beta
         self.gamma = gamma
-        self.delta = delta
+        self.alpha = alpha
 
         self.decay_func = decay_func
         self.src_dataset_obj = None
@@ -77,72 +77,72 @@ class TransGM(BaseEstimator, TransformerMixin):
     # Define gradients for optimization
     def gradient(self, params, data, lambda_=0.1):
         X0, X1, X2, y = data
-        # Compute gradient of MSE Loss w.r.t A
-        def grad_mse_loss_A(A, X1, X2, b, y, d, X0, e):
-            predictions = self.pred(A, X1, X2, b, d, X0, e)
-            grad_f_A = X1 / np.expand_dims(X1 @ A, axis=-1)
+        # Compute gradient of MSE Loss w.r.t gamma
+        def grad_mse_loss_gamma(gamma, X1, X2, beta, y, alpha, X0, e):
+            predictions = self.pred(gamma, X1, X2, beta, alpha, X0, e)
+            grad_f_gamma = X1 / np.expand_dims(X1 @ gamma, axis=-1)
 
-            grad_loss_A = np.mean((predictions - y)[:, :, np.newaxis] * grad_f_A, axis=(0,1))
+            grad_loss_gamma = np.mean((predictions - y)[:, :, np.newaxis] * grad_f_gamma, axis=(0,1))
 
-            return grad_loss_A
+            return grad_loss_gamma
 
-        # Compute gradient of MSE Loss w.r.t b
-        def grad_mse_loss_b(A, X1, X2, b, y, d, X0, e):
-            predictions = self.pred(A, X1, X2, b, d, X0, e)
+        # Compute gradient of MSE Loss w.r.t beta
+        def grad_mse_loss_beta(gamma, X1, X2, beta, y, alpha, X0, e):
+            predictions = self.pred(gamma, X1, X2, beta, alpha, X0, e)
             if self.decay_func == "exp":
-                grad_f_b = -X2  # Gradient of -b * X2 with respect to b
+                grad_f_beta = -X2  # Gradient of -beta * X2 with respect to beta
             else:
-                grad_f_b = -np.log(X2)  # Gradient of -b * log(X2) with respect to b
-            grad_loss_b = np.mean((predictions - y) * grad_f_b)
-            return grad_loss_b
+                grad_f_beta = -np.log(X2)  # Gradient of -beta * log(X2) with respect to beta
+            grad_loss_beta = np.mean((predictions - y) * grad_f_beta)
+            return grad_loss_beta
 
-        # Compute gradient of MSE Loss w.r.t d
-        def grad_mse_loss_d(A, X1, X2, b, y, d, X0, e):
-            predictions = self.pred(A, X1, X2, b, d, X0, e)
-            grad_f_d = np.log(X0)  # Gradient of d * log(X0) with respect to d
-            grad_loss_d = np.mean((predictions - y) * grad_f_d)
-            return grad_loss_d
+        # Compute gradient of MSE Loss w.r.t alpha
+        def grad_mse_loss_alpha(gamma, X1, X2, beta, y, alpha, X0, e):
+            predictions = self.pred(gamma, X1, X2, beta, alpha, X0, e)
+            grad_f_alpha = np.log(X0)  # Gradient of alpha * log(X0) with respect to alpha
+            grad_loss_alpha = np.mean((predictions - y) * grad_f_alpha)
+            return grad_loss_alpha
 
         # Compute gradient of MSE Loss w.r.t e
-        def grad_mse_loss_e(A, X1, X2, b, y, d, X0, e):
-            predictions = self.pred(A, X1, X2, b, d, X0, e)
+        def grad_mse_loss_e(gamma, X1, X2, beta, y, alpha, X0, e):
+            predictions = self.pred(gamma, X1, X2, beta, alpha, X0, e)
             grad_f_e = np.ones_like(X2)  # Gradient of e with respect to e
             grad_loss_e = np.mean((predictions - y) * grad_f_e)
             return grad_loss_e
 
-            # Define hyperparameter grid
-        d, b, *A_vals, e = params
-        A = np.array(A_vals)
+        # Define hyperparameter grid
+        alpha, beta, *gamma_vals, e = params
+        gamma = np.array(gamma_vals)
 
         # Using your existing gradient functions
-        grad_A = grad_mse_loss_A(A, X1, X2, b, y, d, X0, e) + 2 * lambda_ * A
-        grad_b = grad_mse_loss_b(A, X1, X2, b, y, d, X0, e) + 2 * lambda_ * b
-        grad_d = grad_mse_loss_d(A, X1, X2, b, y, d, X0, e) + 2 * lambda_ * d
-        grad_e = grad_mse_loss_e(A, X1, X2, b, y, d, X0, e) + 2 * lambda_ * e
+        grad_gamma = grad_mse_loss_gamma(gamma, X1, X2, beta, y, alpha, X0, e) + 2 * lambda_ * gamma
+        grad_beta = grad_mse_loss_beta(gamma, X1, X2, beta, y, alpha, X0, e) + 2 * lambda_ * beta
+        grad_alpha = grad_mse_loss_alpha(gamma, X1, X2, beta, y, alpha, X0, e) + 2 * lambda_ * alpha
+        grad_e = grad_mse_loss_e(gamma, X1, X2, beta, y, alpha, X0, e) + 2 * lambda_ * e
 
-        return np.hstack([grad_d, grad_b, grad_A, grad_e])
+        return np.hstack([grad_alpha, grad_beta, grad_gamma, grad_e])
 
     # Prediction function
-    def pred(self, A, X1, X2, b, d, X0, e=0):
-        A = np.array(A).reshape(-1, 1)  # Ensure A is a column vector
+    def pred(self, gamma, X1, X2, beta, alpha, X0, e=0):
+        gamma = np.array(gamma).reshape(-1, 1)  # Ensure gamma is a column vector
         if self.decay_func == "exp":
-            return utils.sigmoid(d * np.log(X0) + np.log(np.sum(X1 * A.T, axis=2)) - b * X2 + e)
+            return utils.sigmoid(alpha * np.log(X0) + np.log(np.sum(X1 * gamma.T, axis=2)) - beta * X2 + e)
         else:
-            return utils.sigmoid(d * np.log(X0) + np.log(np.sum(X1 * A.T, axis=2)) - b * np.log(X2) + e)
+            return utils.sigmoid(alpha * np.log(X0) + np.log(np.sum(X1 * gamma.T, axis=2)) - beta * np.log(X2) + e)
 
     def loss(self, params, data, lambda_, log, uuid):
-        d, b, *A_vals, e = params
+        alpha, beta, *gamma_vals, e = params
         X0, X1, X2, y = data
-        A = np.array(A_vals)
+        gamma = np.array(gamma_vals)
 
-        predictions = self.pred(A, X1, X2, b, d, X0, e)
+        predictions = self.pred(gamma, X1, X2, beta, alpha, X0, e)
 
         # L2 regularization + MSE
         pred_error = (
                 np.mean((y - predictions) ** 2) +
-                lambda_ * np.sum(A**2) +
-                lambda_ * d**2 +
-                lambda_ * b**2 +
+                lambda_ * np.sum(gamma**2) +
+                lambda_ * alpha**2 +
+                lambda_ * beta**2 +
                 lambda_ * e**2
         )
 
@@ -151,9 +151,9 @@ class TransGM(BaseEstimator, TransformerMixin):
             if uuid not in log:
                 log[uuid] = []
             log[uuid].append({
-                'd': d,
-                'b': b,
-                'A': A.copy(),
+                'alpha': alpha,
+                'beta': beta,
+                'gamma': gamma.copy(),
                 'e': e,
                 'mse': pred_error
             })
@@ -236,14 +236,14 @@ class TransGM(BaseEstimator, TransformerMixin):
 
                             # Initialize model parameters based on strategy
                             if init_strategy == 'random':
-                                A_init = np.random.rand(11)
-                                d_init, b_init, e_init = np.random.rand(), np.random.rand(), np.random.rand()
+                                gamma_init = np.random.rand(11)
+                                alpha_init, beta_init, e_init = np.random.rand(), np.random.rand(), np.random.rand()
                             else:  # uniform_positive
-                                A_init = np.ones(11) * 0.5
-                                d_init, b_init, e_init = 0.5, 0.5, 0.5
+                                gamma_init = np.ones(11) * 0.5
+                                alpha_init, beta_init, e_init = 0.5, 0.5, 0.5
 
                             # Initial parameters
-                            initial_params = np.hstack([d_init, b_init, A_init, e_init])
+                            initial_params = np.hstack([alpha_init, beta_init, gamma_init, e_init])
 
 
                             # Define bounds for parameters
@@ -266,8 +266,8 @@ class TransGM(BaseEstimator, TransformerMixin):
                             )
 
                             # Extract optimized parameters
-                            d_opt, b_opt, *A_vals_opt, e_opt = result.x
-                            A_opt = np.array(A_vals_opt)
+                            alpha_opt, beta_opt, *gamma_vals_opt, e_opt = result.x
+                            gamma_opt = np.array(gamma_vals_opt)
 
                             # Evaluate on validation set
                             combined_val = X_val.copy()
@@ -277,7 +277,7 @@ class TransGM(BaseEstimator, TransformerMixin):
                             X0_val, X1_val, X2_val, y_val_matrix = self.src_dataset_obj.transform_to_matrices(pd.DataFrame(combined_val))
 
                             # Get predictions
-                            val_pred = self.pred(A_opt, X1_val, X2_val, b_opt, d_opt, X0_val, e_opt)
+                            val_pred = self.pred(gamma_opt, X1_val, X2_val, beta_opt, alpha_opt, X0_val, e_opt)
 
                             # Calculate R² on validation set
                             val_r2 = r2_score(y_val_matrix.flatten(), val_pred.flatten())
@@ -318,14 +318,14 @@ class TransGM(BaseEstimator, TransformerMixin):
 
             # Initialize based on best strategy
             if init_strategy == 'random':
-                A_init = np.random.rand(11)
-                d_init, b_init, e_init = np.random.rand(), np.random.rand(), np.random.rand()
+                gamma_init = np.random.rand(11)
+                alpha_init, beta_init, e_init = np.random.rand(), np.random.rand(), np.random.rand()
             else:  # uniform_positive
-                A_init = np.ones(11) * 0.5
-                d_init, b_init, e_init = 0.5, 0.5, 0.5
+                gamma_init = np.ones(11) * 0.5
+                alpha_init, beta_init, e_init = 0.5, 0.5, 0.5
 
             # Initial parameters
-            initial_params = np.hstack([d_init, b_init, A_init, e_init])
+            initial_params = np.hstack([alpha_init, beta_init, gamma_init, e_init])
 
             # Define bounds for parameters
             bounds = [(1e-6, None) for _ in range(len(initial_params))]
@@ -347,8 +347,8 @@ class TransGM(BaseEstimator, TransformerMixin):
                 }
             )
 
-            d_opt, b_opt, *A_vals_opt, e_opt = result.x
-            A_opt = np.array(A_vals_opt)
+            alpha_opt, beta_opt, *gamma_vals_opt, e_opt = result.x
+            gamma_opt = np.array(gamma_vals_opt)
 
             # Evaluate on test set
             combined_test = X_test.copy()
@@ -358,7 +358,7 @@ class TransGM(BaseEstimator, TransformerMixin):
             X0_test, X1_test, X2_test, y_test_matrix = self.src_dataset_obj.transform_to_matrices(pd.DataFrame(combined_test))
 
             # Get predictions
-            test_pred = self.pred(A_opt, X1_test, X2_test, b_opt, d_opt, X0_test, e_opt)
+            test_pred = self.pred(gamma_opt, X1_test, X2_test, beta_opt, alpha_opt, X0_test, e_opt)
 
             # Calculate R² on test set
             test_r2 = r2_score(y_test_matrix.flatten(), test_pred.flatten())
@@ -373,7 +373,7 @@ class TransGM(BaseEstimator, TransformerMixin):
             if test_r2 > best_score:
                 best_score = test_r2
                 best_params = fold_best_params
-                best_model_params = {'d': d_opt, 'b': b_opt, 'A': A_opt, 'e': e_opt}
+                best_model_params = {'alpha': alpha_opt, 'beta': beta_opt, 'gamma': gamma_opt, 'e': e_opt}
 
         # Print overall best parameters
         print("\n==== Cross-Validation Summary ====")
@@ -395,14 +395,14 @@ class TransGM(BaseEstimator, TransformerMixin):
 
         # Initialize based on best strategy
         if best_params['init_strategy'] == 'random':
-            A_init = np.random.rand(11)
-            d_init, b_init, e_init = np.random.rand(), np.random.rand(), np.random.rand()
+            gamma_init = np.random.rand(11)
+            alpha_init, beta_init, e_init = np.random.rand(), np.random.rand(), np.random.rand()
         else:  # uniform_positive
-            A_init = np.ones(11) * 0.5
-            d_init, b_init, e_init = 0.5, 0.5, 0.5
+            gamma_init = np.ones(11) * 0.5
+            alpha_init, beta_init, e_init = 0.5, 0.5, 0.5
 
         # Initial parameters
-        initial_params = np.hstack([d_init, b_init, A_init, e_init])
+        initial_params = np.hstack([alpha_init, beta_init, gamma_init, e_init])
 
         # Optimize with the best parameters
         lambda_ = best_params['lambda']
@@ -429,11 +429,11 @@ class TransGM(BaseEstimator, TransformerMixin):
         # Save logged parameters to a file
         utils.save_params_log(params_log, run_id)
 
-        d_opt, b_opt, *A_vals_opt, e_opt = result.x
-        A_opt = np.array(A_vals_opt)
+        alpha_opt, beta_opt, *gamma_vals_opt, e_opt = result.x
+        gamma_opt = np.array(gamma_vals_opt)
 
         # Calculate predictions on full dataset
-        pred_trips = self.pred(A_opt, X1, X2, b_opt, d_opt, X0, e_opt)
+        pred_trips = self.pred(gamma_opt, X1, X2, beta_opt, alpha_opt, X0, e_opt)
         r2 = r2_score(y.flatten(), pred_trips.flatten())
 
         # Compute outflows (origins)
@@ -469,13 +469,13 @@ class TransGM(BaseEstimator, TransformerMixin):
             decay_function=self.decay_func,
             source=self.source,
             target=None,
-            init_b=b_init,
-            init_d=d_init,
-            init_A=A_init,
+            init_beta=beta_init,
+            init_alpha=alpha_init,
+            init_gamma=gamma_init,
             init_e=e_init,
-            optimal_b=b_opt,
-            optimal_d=d_opt,
-            optimal_A=A_opt,
+            optimal_beta=beta_opt,
+            optimal_alpha=alpha_opt,
+            optimal_gamma=gamma_opt,
             optimal_e=e_opt,
             rmse=mse,
             r2=r2,
@@ -517,17 +517,17 @@ class TransGM(BaseEstimator, TransformerMixin):
             params_log[run_id] = []
 
         # No parameter tuning, use the best parameters from the source model
-        d_opt, b_opt, *A_vals_opt, e_opt = (self.src_model_results.optimal_d,
-                                            self.src_model_results.optimal_b,
-                                            self.src_model_results.optimal_A,
-                                            self.src_model_results.optimal_e)
+        alpha_opt, beta_opt, *gamma_vals_opt, e_opt = (self.src_model_results.optimal_alpha,
+                                                       self.src_model_results.optimal_beta,
+                                                       self.src_model_results.optimal_gamma,
+                                                       self.src_model_results.optimal_e)
 
-        A_opt = np.array(A_vals_opt)
+        gamma_opt = np.array(gamma_vals_opt)
         # Log the parameters
         params_log[run_id].append({
-            'd': d_opt,
-            'b': b_opt,
-            'A': A_opt,
+            'alpha': alpha_opt,
+            'beta': beta_opt,
+            'gamma': gamma_opt,
             'e': e_opt
         })
 
@@ -535,7 +535,7 @@ class TransGM(BaseEstimator, TransformerMixin):
         utils.save_params_log(params_log, run_id)
 
         # Calculate predictions on full dataset
-        pred_trips = self.pred(A_opt, X1, X2, b_opt, d_opt, X0, e_opt)
+        pred_trips = self.pred(gamma_opt, X1, X2, beta_opt, alpha_opt, X0, e_opt)
         r2 = r2_score(y.flatten(), pred_trips.flatten())
 
         # Compute outflows (origins)
@@ -620,9 +620,9 @@ class TransGM(BaseEstimator, TransformerMixin):
         # Estimate the baseline model on the source city
         # === Print Results ===
         print(f"\n=== Source: {self.source} Results ===")
-        print(f"Optimal b: {round(self.src_model_results.optimal_b, 5)}")
-        print(f"Optimal d: {round(self.src_model_results.optimal_d, 5)}")
-        print(f"Optimal A: {[round(a, 5) for a in np.round(self.src_model_results.optimal_A, 5)]}")
+        print(f"Optimal beta: {round(self.src_model_results.optimal_beta, 5)}")
+        print(f"Optimal alpha: {round(self.src_model_results.optimal_alpha, 5)}")
+        print(f"Optimal gamma: {[round(a, 5) for a in np.round(self.src_model_results.optimal_gamma, 5)]}")
         print(f"Optimal e: {round(self.src_model_results.init_e, 5)}")
         print(f"\nSource RMSE: {self.src_model_results.rmse:.4f}")
         print(f"Source R²: {self.src_model_results.r2:.4f}")
@@ -633,13 +633,13 @@ class TransGM(BaseEstimator, TransformerMixin):
             params_log[run_id] = []
 
         # Define transfer learning loss function with regularization
-        def trans_loss(params, X1, X2, X0, y_trans, k, A_opt, b_opt, d_opt, e_opt, lambda_reg=0.1):
-            d, b, *A_vals = params[:-1]
+        def trans_loss(params, X1, X2, X0, y_trans, k, gamma_opt, beta_opt, alpha_opt, e_opt, lambda_reg=0.1):
+            alpha, beta, *gamma_vals = params[:-1]
             e = params[-1]
-            A = np.array(A_vals)
+            gamma = np.array(gamma_vals)
 
             # Make predictions
-            predictions = self.pred(A, X1, X2, b, d, X0, e)
+            predictions = self.pred(gamma, X1, X2, beta, alpha, X0, e)
 
             # Calculate prediction error (MSE)
             # prediction_error = np.mean((y_trans - predictions) ** 2)
@@ -647,9 +647,9 @@ class TransGM(BaseEstimator, TransformerMixin):
 
             # Log the parameters
             params_log[run_id].append({
-                'd': d,
-                'b': b,
-                'A': A,
+                'alpha': alpha,
+                'beta': beta,
+                'gamma': gamma,
                 'e': e,
                 'mse': prediction_error
             })
@@ -659,20 +659,20 @@ class TransGM(BaseEstimator, TransformerMixin):
             if divs is None or len(divs) == 0:
                 raise ValueError("You must provide feature divergence first")
 
-            A_penalty_factors = getattr(AdaptFunc, adapt_func)(divs, k=k)
-            # print(f"Penalty factors: {A_penalty_factors}")
+            gamma_penalty_factors = getattr(AdaptFunc, adapt_func)(divs, k=k)
+            # print(f"Penalty factors: {gamma_penalty_factors}")
             # L2 regularization on parameter differences from source model
-            A_reg = np.sum(A_penalty_factors * np.abs(A - A_opt) ** 2)
+            gamma_reg = np.sum(gamma_penalty_factors * np.abs(gamma - gamma_opt) ** 2)
 
-            b_reg = lambda_reg * np.abs(b - b_opt) ** 2
-            d_reg = lambda_reg * np.abs(d - d_opt) ** 2
+            beta_reg = lambda_reg * np.abs(beta - beta_opt) ** 2
+            alpha_reg = lambda_reg * np.abs(alpha - alpha_opt) ** 2
             e_reg = lambda_reg * np.abs(e - e_opt) ** 2
 
             # Total loss with regularization
             return (prediction_error
-                    + A_reg
-                    + b_reg
-                    + d_reg
+                    + gamma_reg
+                    + beta_reg
+                    + alpha_reg
                     + e_reg
                     )
             # End of  trans_loss function
@@ -708,21 +708,21 @@ class TransGM(BaseEstimator, TransformerMixin):
                     X2_tgt_train, X2_tgt_val = X2_tgt[train_idx], X2_tgt[val_idx]
                     y_tgt_train, y_tgt_val = y_tgt[train_idx], y_tgt[val_idx]
 
-                    trans_init_params = np.hstack([self.src_model_results.optimal_d, self.src_model_results.optimal_b, self.src_model_results.optimal_A, self.src_model_results.optimal_e])
+                    trans_init_params = np.hstack([self.src_model_results.optimal_alpha, self.src_model_results.optimal_beta, self.src_model_results.optimal_gamma, self.src_model_results.optimal_e])
 
                     # Define bounds to ensure parameters remain positive
                     bounds = [(1e-6, None) for _ in range(len(trans_init_params))]
 
                     # Optimize with current hyperparameters
                     try:
-                        print("optimal_A:", np.shape(self.src_model_results.optimal_A))
+                        print("optimal_gamma:", np.shape(self.src_model_results.optimal_gamma))
                         transfer_result = minimize(
                             trans_loss,
                             trans_init_params,
                             args=(X1_tgt_train, X2_tgt_train, X0_tgt_train, y_tgt_train, k,
-                                  self.src_model_results.optimal_A,
-                                  self.src_model_results.optimal_b,
-                                  self.src_model_results.optimal_d,
+                                  self.src_model_results.optimal_gamma,
+                                  self.src_model_results.optimal_beta,
+                                  self.src_model_results.optimal_alpha,
                                   self.src_model_results.optimal_e, lambda_reg),
                             bounds=bounds,
                             method='L-BFGS-B',
@@ -731,16 +731,16 @@ class TransGM(BaseEstimator, TransformerMixin):
                     except Exception as e:
                         print("Shapes:")
                         print("trans_init_params:", np.shape(trans_init_params))
-                        print("optimal_A:", np.shape(self.src_model_results.optimal_A))
+                        print("optimal_gamma:", np.shape(self.src_model_results.optimal_gamma))
                         print("lambda_reg:", lambda_reg)
                         raise
 
                     # Extract optimized parameters
-                    d_val, b_val, *A_vals, e_val = transfer_result.x
-                    A_val = np.array(A_vals)
+                    alpha_val, beta_val, *gamma_vals, e_val = transfer_result.x
+                    gamma_val = np.array(gamma_vals)
 
                     # Evaluate on validation set
-                    val_pred = self.pred(A_val, X1_tgt_val, X2_tgt_val, b_val, d_val, X0_tgt_val, e_val)
+                    val_pred = self.pred(gamma_val, X1_tgt_val, X2_tgt_val, beta_val, alpha_val, X0_tgt_val, e_val)
                     val_r2 = r2_score(y_tgt_val.flatten(), val_pred.flatten())
 
                     fold_scores.append(val_r2)
@@ -767,14 +767,14 @@ class TransGM(BaseEstimator, TransformerMixin):
         # Train final model on all target data with best hyperparameters
         print("\nTraining final model with best hyperparameters...")
 
-        trans_init_params = np.hstack([self.src_model_results.optimal_d, self.src_model_results.optimal_b, self.src_model_results.optimal_A, self.src_model_results.optimal_e])
+        trans_init_params = np.hstack([self.src_model_results.optimal_alpha, self.src_model_results.optimal_beta, self.src_model_results.optimal_gamma, self.src_model_results.optimal_e])
         bounds = [(1e-6, None) for _ in range(len(trans_init_params))]
 
         # Optimize the target model with the best hyperparameters and parameters from the source model as initialization
         final_result = minimize(
             trans_loss,
             trans_init_params,
-            args=(X1_tgt, X2_tgt, X0_tgt, y_tgt, self.get_divs(), best_k, self.src_model_results.optimal_A, self.src_model_results.optimal_b, self.src_model_results.optimal_d, self.src_model_results.optimal_e, best_lambda),
+            args=(X1_tgt, X2_tgt, X0_tgt, y_tgt, best_k, self.src_model_results.optimal_gamma, self.src_model_results.optimal_beta, self.src_model_results.optimal_alpha, self.src_model_results.optimal_e, best_lambda),
             bounds=bounds,
             method='L-BFGS-B',
             options={'maxiter': 300, 'ftol': 1e-8, 'gtol': 1e-8}
@@ -784,20 +784,20 @@ class TransGM(BaseEstimator, TransformerMixin):
         utils.save_params_log(params_log, run_id)
 
         # Extract final optimized parameters
-        d_trans_opt, b_trans_opt, *A_trans_vals, e_trans_opt = final_result.x
-        A_trans_opt = np.array(A_trans_vals)
+        alpha_trans_opt, beta_trans_opt, *gamma_trans_vals, e_trans_opt = final_result.x
+        gamma_trans_opt = np.array(gamma_trans_vals)
 
         print("\n=== Adapt Results ===")
-        print(f"Trans b: {round(b_trans_opt, 5)}")
-        print(f"Trans d: {round(d_trans_opt, 5)}")
-        print(f"Trans A: {[round(a, 5) for a in np.round(A_trans_opt, 5)]}")
+        print(f"Trans beta: {round(beta_trans_opt, 5)}")
+        print(f"Trans alpha: {round(alpha_trans_opt, 5)}")
+        print(f"Trans gamma: {[round(a, 5) for a in np.round(gamma_trans_opt, 5)]}")
         print(f"Trans e: {round(e_trans_opt, 5)}")
 
         print(f"Final Loss: {final_result.fun}")
         print(f"Success: {final_result.success}")
         print(f"Iterations: {final_result.nit}")
 
-        final_pred = self.pred(A_trans_opt, X1_tgt, X2_tgt, b_trans_opt, d_trans_opt, X0_tgt, e_trans_opt)
+        final_pred = self.pred(gamma_trans_opt, X1_tgt, X2_tgt, beta_trans_opt, alpha_trans_opt, X0_tgt, e_trans_opt)
         final_r2 = r2_score(y_tgt.flatten(), final_pred.flatten())
         final_rmse = mean_squared_error(y_tgt.flatten(), final_pred.flatten())
         print(f"\nRMSE: {final_rmse:.4f}")
@@ -820,20 +820,20 @@ class TransGM(BaseEstimator, TransformerMixin):
 
         # Return model results
         self.adapt_model_results = ModelResult(
-            uuid=uuid,
+            uuid=uuid_val,
             model_name="Adapt_Model",
             serial=serial,
             model_sample=model_sample,
             decay_function=self.decay_func,
             source=self.source,
             target=self.target,
-            init_b=self.src_model_results.optimal_b,
-            init_d=self.src_model_results.optimal_d,
-            init_A=self.src_model_results.optimal_A,
+            init_beta=self.src_model_results.optimal_beta,
+            init_alpha=self.src_model_results.optimal_alpha,
+            init_gamma=self.src_model_results.optimal_gamma,
             init_e=self.src_model_results.optimal_e,
-            optimal_b=b_trans_opt,
-            optimal_d=d_trans_opt,
-            optimal_A=A_trans_opt,
+            optimal_beta=beta_trans_opt,
+            optimal_alpha=alpha_trans_opt,
+            optimal_gamma=gamma_trans_opt,
             optimal_e=e_trans_opt,
             rmse=final_rmse,
             r2=final_r2,
@@ -866,11 +866,9 @@ class TransGM(BaseEstimator, TransformerMixin):
         if model == 'adapt':
             return self.adapt_model_results
 
-
-
 class ModelResult:
-    def __init__(self, model_name, serial, model_sample, decay_function, source, target, init_b, init_d, init_A, init_e, optimal_b, optimal_d, optimal_A, optimal_e, rmse, r2,
-                 in_r2, out_r2, dest_mae, dest_mse, cv_best_params=None, cv_best_score=None, uuid=None, pred_trips=None, dist_matrix=None, dest_result = None, orig_result = None):
+    def __init__(self, model_name, serial, model_sample, decay_function, source, target, init_beta, init_alpha, init_gamma, init_e, optimal_beta, optimal_alpha, optimal_gamma, optimal_e, rmse, r2,
+                 in_r2, out_r2, dest_mae, dest_mse, cv_best_params=None, cv_best_score=None, uuid=None, pred_trips=None, dist_matrix=None, dest_result=None, orig_result=None):
         self.uuid = uuid
         self.model_name = model_name
         self.serial = serial
@@ -878,13 +876,13 @@ class ModelResult:
         self.decay_function = decay_function  # 'exp' or 'pow'
         self.source = source  # 'bir' or 'cov'
         self.target = target  # 'bir' or 'cov'
-        self.init_b = init_b
-        self.init_d = init_d
-        self.init_A = init_A
+        self.init_beta = init_beta
+        self.init_alpha = init_alpha
+        self.init_gamma = init_gamma
         self.init_e = init_e
-        self.optimal_b = optimal_b
-        self.optimal_d = optimal_d
-        self.optimal_A = optimal_A
+        self.optimal_beta = optimal_beta
+        self.optimal_alpha = optimal_alpha
+        self.optimal_gamma = optimal_gamma
         self.optimal_e = optimal_e
         self.rmse = rmse
         self.r2 = r2
@@ -905,8 +903,8 @@ class ModelResult:
         return (f"ModelResult(model_name={self.model_name}, serial={self.serial}, "
                 f"model_sample={self.model_sample}, decay_function={self.decay_function}, "
                 f"source={self.source}, target={self.target}, "
-                f"init_b={self.init_b}, init_d={self.init_d}, init_A={self.init_A}, init_e={self.init_e}, "
-                f"optimal_b={self.optimal_b}, optimal_d={self.optimal_d}, optimal_A={self.optimal_A}, optimal_e={self.optimal_e}, "
+                f"init_beta={self.init_beta}, init_alpha={self.init_alpha}, init_gamma={self.init_gamma}, init_e={self.init_e}, "
+                f"optimal_beta={self.optimal_beta}, optimal_alpha={self.optimal_alpha}, optimal_gamma={self.optimal_gamma}, optimal_e={self.optimal_e}, "
                 f"rmse={self.rmse}, r2={self.r2}, dest_mae={self.dest_mae}, dest_mse={self.dest_mse}) \n cv_best_params={self.cv_best_params}, cv_best_score={self.cv_best_score}")
 
     def to_dataframe(self):
@@ -917,11 +915,26 @@ class ModelResult:
             "decay_function": [self.decay_function],
             "source": [self.source],
             "target": [self.target],
-            "init_b": [self.init_b],
-            "init_d": [self.init_d],
+            "init_beta": [self.init_beta],
+            "init_alpha": [self.init_alpha],
+        }
+
+        # Add init_gamma columns
+        for i, val in enumerate(self.init_gamma):
+            data[f"init_gamma_{i}"] = [val]
+
+        # Add remaining columns in the specified order
+        data.update({
             "init_e": [self.init_e],
-            "optimal_b": [self.optimal_b],
-            "optimal_d": [self.optimal_d],
+            "optimal_beta": [self.optimal_beta],
+            "optimal_alpha": [self.optimal_alpha],
+        })
+
+        # Add optimal_gamma columns
+        for i, val in enumerate(self.optimal_gamma):
+            data[f"optimal_gamma_{i}"] = [val]
+
+        data.update({
             "optimal_e": [self.optimal_e],
             "rmse": [self.rmse],
             "r2": [self.r2],
@@ -929,13 +942,7 @@ class ModelResult:
             "dest_mse": [self.dest_mse],
             "cv_best_params": [self.cv_best_params],
             "cv_best_score": [self.cv_best_score]
-        }
-
-        for i, val in enumerate(self.init_A):
-            data[f"init_A_{i}"] = [val]
-
-        for i, val in enumerate(self.optimal_A):
-            data[f"optimal_A_{i}"] = [val]
+        })
 
         return pd.DataFrame(data)
 
@@ -943,4 +950,3 @@ class ModelResult:
     def aggregate_results(models):
         dfs = [model.to_dataframe() for model in models]
         return pd.concat(dfs, ignore_index=True)
-

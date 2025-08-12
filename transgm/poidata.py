@@ -52,6 +52,3 @@ class POIData:
             i += 1
         return dest_tensor, x, y
 
-    def validate(self):
-        """Validate the consistency and quality of the OD dataset."""
-        pass
